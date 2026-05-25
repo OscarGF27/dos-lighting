@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.application.chat_message_result import ChatMessageResult
 from app.backend_client import BackendClient
 from app.chat_service import (
     ChatProcessingError,
@@ -14,10 +16,34 @@ from app.chat_service import (
 )
 from app.config import Settings, get_settings
 from app.openai_client import OpenAIResponsesClient
+from app.ports import HandleChatMessageUseCase
 from app.rate_limiter import RateLimitExceeded, RateLimiter
 from app.schemas import ChatMessageRequest, ChatMessageResponse, HealthResponse
 from app.session_store import SessionStore
 from app.tools import ToolRunner
+
+
+def map_chat_result_to_response(
+    result: ChatMessageResult | dict[str, Any],
+) -> ChatMessageResponse:
+    if isinstance(result, ChatMessageResult):
+        return ChatMessageResponse.model_validate(
+            {
+                "session_id": result.session_id,
+                "reply_text": result.reply_text,
+                "quick_replies": result.quick_replies,
+                "missing_fields": result.missing_fields,
+                "recommendation": result.recommendation,
+                "reset_session": result.reset_session,
+            }
+        )
+
+    if isinstance(result, dict):
+        return ChatMessageResponse.model_validate(result)
+
+    raise ChatProcessingError(
+        "El servicio de chat devolvio un formato de respuesta no valido."
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -87,7 +113,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             payload = {"message": str(detail)}
         return JSONResponse(status_code=exc.status_code, content=payload)
 
-    def get_chat_service(request: Request) -> ChatService:
+    def get_chat_service(request: Request) -> HandleChatMessageUseCase:
         return request.app.state.chat_service
 
     @app.get("/api/chat/health", response_model=HealthResponse)
@@ -105,15 +131,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def chat_message(
         payload: ChatMessageRequest,
         request: Request,
-        chat_service: ChatService = Depends(get_chat_service),
+        chat_service: HandleChatMessageUseCase = Depends(get_chat_service),
     ) -> ChatMessageResponse:
         client_host = request.client.host if request.client else "anonymous"
         try:
-            return await chat_service.handle_message(
+            result = await chat_service.handle_message(
                 session_id=payload.session_id,
                 user_message=payload.message,
                 client_key=client_host,
             )
+            return map_chat_result_to_response(result)
         except ChatServiceUnavailable as error:
             raise HTTPException(status_code=503, detail={"message": str(error)}) from error
         except RateLimitExceeded as error:

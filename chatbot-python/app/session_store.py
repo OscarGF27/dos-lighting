@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable
 from uuid import uuid4
 
@@ -15,7 +15,7 @@ class SessionStore:
     ) -> None:
         self._ttl = timedelta(minutes=ttl_minutes)
         self._sessions: dict[str, ChatSession] = {}
-        self._now_provider = now_provider or (lambda: datetime.now(UTC))
+        self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
 
     def _now(self) -> datetime:
         return self._now_provider()

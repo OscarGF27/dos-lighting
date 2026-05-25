@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 
@@ -19,7 +19,7 @@ class RateLimiter:
         self._max_requests = max_requests
         self._window = timedelta(seconds=window_seconds)
         self._events: dict[str, deque[datetime]] = defaultdict(deque)
-        self._now_provider = now_provider or (lambda: datetime.now(UTC))
+        self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
 
     def _now(self) -> datetime:
         return self._now_provider()

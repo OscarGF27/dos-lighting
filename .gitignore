@@ -25,3 +25,4 @@ chatbot-python/.pytest_cache
 chatbot-python/.coverage
 __pycache__/
 *.pyc
+chatbot-python/*.log

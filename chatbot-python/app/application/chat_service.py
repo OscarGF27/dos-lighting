@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from app.application.fallback_assistant import FallbackAssistant
+from app.application.chat_message_result import ChatMessageResult
 from app.domain.errors import LlmServiceError
 from app.ports import LlmClient, RateLimiterPort, SessionRepository, ToolExecutor
 from app.prompts import STARTER_QUICK_REPLIES, SYSTEM_PROMPT, build_session_snapshot
 from app.rate_limiter import RateLimitExceeded
-from app.schemas import ChatMessageResponse
 from app.domain.conversation import ChatSession, SessionMetadata
 from app.domain.tooling import ToolContextUpdate
 
@@ -56,7 +56,7 @@ class ChatService:
         session_id: str | None,
         user_message: str,
         client_key: str,
-    ) -> ChatMessageResponse:
+    ) -> ChatMessageResult:
         self._rate_limiter.check(client_key)
         session, reset_session = self._session_store.get_or_create(session_id)
 
@@ -124,14 +124,14 @@ class ChatService:
         self._merge_session_metadata(session.metadata, context_update)
 
         quick_replies = self._build_quick_replies(session, context_update)
-        return ChatMessageResponse(
-            sessionId=session.session_id,
-            replyText=reply_text,
-            quickReplies=quick_replies,
-            missingFields=context_update.last_missing_fields
+        return ChatMessageResult(
+            session_id=session.session_id,
+            reply_text=reply_text,
+            quick_replies=quick_replies,
+            missing_fields=context_update.last_missing_fields
             or session.metadata.last_missing_fields,
             recommendation=context_update.last_recommendation,
-            resetSession=reset_session,
+            reset_session=reset_session,
         )
 
     async def _handle_fallback_response(
@@ -140,21 +140,21 @@ class ChatService:
         session: ChatSession,
         user_message: str,
         reset_session: bool,
-    ) -> ChatMessageResponse:
+    ) -> ChatMessageResult:
         fallback = await self._fallback_assistant.respond(session, user_message)
         reply_text = fallback.reply_text.strip() or "Listo, sigamos con la recomendacion."
 
         self._session_store.append_turn(session, user_message, reply_text)
         self._merge_session_metadata(session.metadata, fallback.context_update)
 
-        return ChatMessageResponse(
-            sessionId=session.session_id,
-            replyText=reply_text,
-            quickReplies=fallback.quick_replies or STARTER_QUICK_REPLIES,
-            missingFields=fallback.context_update.last_missing_fields
+        return ChatMessageResult(
+            session_id=session.session_id,
+            reply_text=reply_text,
+            quick_replies=fallback.quick_replies or STARTER_QUICK_REPLIES,
+            missing_fields=fallback.context_update.last_missing_fields
             or session.metadata.last_missing_fields,
             recommendation=fallback.context_update.last_recommendation,
-            resetSession=reset_session,
+            reset_session=reset_session,
         )
 
     def _build_input_items(

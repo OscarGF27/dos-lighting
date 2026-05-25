@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from app.application.chat_message_result import ChatMessageResult
 from app.domain.conversation import ChatSession
 from app.domain.tooling import ToolResult
-from app.schemas import ChatMessageResponse
 
 
 class LlmClient(Protocol):
@@ -51,4 +51,4 @@ class ToolExecutor(Protocol):
 class HandleChatMessageUseCase(Protocol):
     async def handle_message(
         self, *, session_id: str | None, user_message: str, client_key: str
-    ) -> ChatMessageResponse: ...
+    ) -> ChatMessageResult: ...

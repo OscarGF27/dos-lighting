@@ -71,7 +71,7 @@ async function databaseSchemaSummary(): Promise<string> {
 
 function apiContracts(): string {
   return [
-    "- GET /api/health",
+    "- GET /actuator/health",
     "- POST /api/recomendaciones/resolver",
     "- GET /api/v1/modelos-vehiculo/:modeloId/decision-sistema-optico",
     "- GET /api/chat/health",
